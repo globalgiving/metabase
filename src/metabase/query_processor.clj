@@ -353,3 +353,13 @@
   [query, options :- mbql.s/Info]
   (let [query (assoc-in query [:middleware :add-default-userland-constraints?] true)]
     (process-query-and-save-execution! query options)))
+
+
+(s/defn process-query-and-save-with-higher-max-results-constraints!
+  "Same as `process-query-and-save-execution!` but will include the default max rows returned as a constraint. (This
+  function is ulitmately what powers most API endpoints that run queries, including `POST /api/dataset`.)"
+  {:style/indent 1}
+  [query, options :- mbql.s/Info]
+  (let [query (assoc-in query [:middleware :add-higher-userland-constraints?] true)]
+    (process-query-and-save-execution! query options)))
+    
