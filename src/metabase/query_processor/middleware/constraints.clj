@@ -40,3 +40,24 @@
   [qp]
   (fn [query respond raise canceled-chan]
     (qp (add-default-userland-constraints* query) respond raise canceled-chan)))
+    
+(def higher-query-constraints
+  "Default map of constraints that we apply on dataset queries executed by the api for pulse emails."
+  {:max-results           30000
+   :max-results-bare-rows 20000})   
+   
+(defn- merge-higher-constraints [constraints]
+  (merge higher-query-constraints constraints))
+      
+(defn- add-higher-userland-constraints*
+  "Add default values of `:max-results` and `:max-results-bare-rows` to `:constraints` map `m`."
+  [{{:keys [add-higher-userland-constraints?]} :middleware, :as query}]
+  (cond-> query
+    add-higher-userland-constraints? (update :constraints (comp ensure-valid-constraints merge-higher-constraints))))
+
+(defn add-higher-userland-constraints
+  "Middleware that optionally adds expanded `max-results` and `max-results-bare-rows` constraints to queries, meant for
+  use with `process-query-and-save-with-higher-max-results-constraints!`, which ultimately powers the pulse attachments"
+  [qp]
+  (fn [query respond raise canceled-chan]
+    (qp (add-higher-userland-constraints* query) respond raise canceled-chan)))    

@@ -35,7 +35,7 @@
         (let [{:keys [creator_id dataset_query]} card
               query                              (assoc dataset_query :async? false)]
           {:card   card
-           :result (qp/process-query-and-save-with-max-results-constraints! query
+           :result (qp/process-query-and-save-with-higher-max-results-constraints! query
                      (merge {:executed-by creator_id
                              :context     :pulse
                              :card-id     card-id}
