@@ -5,14 +5,17 @@ import Question from "../Question";
 
 import Base from "./Base";
 import Database from "./Database";
+import Schema from "./Schema";
 import Field from "./Field";
 
 import type { SchemaName } from "metabase/meta/types/Table";
 import type { FieldMetadata } from "metabase/meta/types/Metadata";
 
-import { titleize, humanize } from "metabase/lib/formatting";
+import { singularize } from "metabase/lib/formatting";
 
 import Dimension from "../Dimension";
+
+import type StructuredQuery from "metabase-lib/lib/queries/StructuredQuery";
 
 type EntityType = string; // TODO: move somewhere central
 
@@ -22,15 +25,18 @@ import _ from "underscore";
 export default class Table extends Base {
   description: string;
 
-  schema: ?SchemaName;
   db: Database;
+
+  schema: ?Schema;
+  // @deprecated: use schema.name (all tables should have a schema object, in theory)
+  schema_name: ?SchemaName;
 
   fields: FieldMetadata[];
 
   entity_type: ?EntityType;
 
   hasSchema(): boolean {
-    return (this.schema && this.db.schemaNames().length > 1) || false;
+    return (this.schema_name && this.db && this.db.schemas.length > 1) || false;
   }
 
   // $FlowFixMe Could be replaced with hydrated database property in selectors/metadata.js (instead / in addition to `table.db`)
@@ -39,13 +45,26 @@ export default class Table extends Base {
   }
 
   newQuestion(): Question {
-    return Question.create({
-      databaseId: this.db.id,
-      tableId: this.id,
-      metadata: this.metadata,
-    })
+    return this.question()
       .setDefaultQuery()
       .setDefaultDisplay();
+  }
+
+  question(): Question {
+    return Question.create({
+      databaseId: this.db && this.db.id,
+      tableId: this.id,
+      metadata: this.metadata,
+    });
+  }
+
+  query(query = {}): StructuredQuery {
+    return (
+      this.question()
+        .query()
+        // $FlowFixMe: we know question returns a StructuredQuery but flow doesn't
+        .updateQuery(q => ({ ...q, ...query }))
+    );
   }
 
   dimensions(): Dimension[] {
@@ -54,21 +73,29 @@ export default class Table extends Base {
 
   displayName({ includeSchema } = {}) {
     return (
-      (includeSchema && this.schema
-        ? titleize(humanize(this.schema)) + "."
-        : "") + this.display_name
+      (includeSchema && this.schema ? this.schema.displayName() + "." : "") +
+      this.display_name
     );
+  }
+
+  /**
+   * The singular form of the object type this table represents
+   * Currently we try to guess this by singularizing `display_name`, but ideally it would be configurable in metadata
+   * See also `field.targetObjectName()`
+   */
+  objectName() {
+    return singularize(this.displayName());
   }
 
   dateFields(): Field[] {
     return this.fields.filter(field => field.isDate());
   }
 
-  aggregations() {
-    return this.aggregation_options || [];
+  aggregationOperators() {
+    return this.aggregation_operators || [];
   }
 
   aggregation(agg) {
-    return _.findWhere(this.aggregations(), { short: agg });
+    return _.findWhere(this.aggregationOperators(), { short: agg });
   }
 }
