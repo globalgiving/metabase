@@ -20,25 +20,31 @@
 (deftest describe-table-test
   (is (= {:name   "VENUES"
           :schema "PUBLIC"
-          :fields #{{:name          "NAME",
-                     :database-type "VARCHAR"
-                     :base-type     :type/Text}
-                    {:name          "LATITUDE"
-                     :database-type "DOUBLE"
-                     :base-type     :type/Float}
-                    {:name          "LONGITUDE"
-                     :database-type "DOUBLE"
-                     :base-type     :type/Float}
-                    {:name          "PRICE"
-                     :database-type "INTEGER"
-                     :base-type     :type/Integer}
-                    {:name          "CATEGORY_ID"
-                     :database-type "INTEGER"
-                     :base-type     :type/Integer}
-                    {:name          "ID"
-                     :database-type "BIGINT"
-                     :base-type     :type/BigInteger
-                     :pk?           true}}}
+          :fields #{{:name              "ID"
+                     :database-type     "BIGINT"
+                     :base-type         :type/BigInteger
+                     :pk?               true
+                     :database-position 0}
+                    {:name              "NAME"
+                     :database-type     "VARCHAR"
+                     :base-type         :type/Text
+                     :database-position 1}
+                    {:name              "CATEGORY_ID"
+                     :database-type     "INTEGER"
+                     :base-type         :type/Integer
+                     :database-position 2}
+                    {:name              "LATITUDE"
+                     :database-type     "DOUBLE"
+                     :base-type         :type/Float
+                     :database-position 3}
+                    {:name              "LONGITUDE"
+                     :database-type     "DOUBLE"
+                     :base-type         :type/Float
+                     :database-position 4}
+                    {:name              "PRICE"
+                     :database-type     "INTEGER"
+                     :base-type         :type/Integer
+                     :database-position 5}}}
          (driver/describe-table :h2 (mt/db) (Table (mt/id :venues))))))
 
 (deftest describe-table-fks-test
@@ -161,37 +167,38 @@
          :native   spliced})))))
 
 (deftest splice-parameters-mbql-test
-  (mt/test-drivers (sql-jdbc.tu/sql-jdbc-drivers)
-    (mt/$ids venues
-      (testing "splicing a string"
-        (is (= 3
-               (spliced-count-of :venues [:starts-with $name "Sushi"])))
-        (testing "containing single quotes -- this is done differently from driver to driver"
-          (is (= 1
-                 (spliced-count-of :venues [:= $name "Barney's Beanery"])))))
-      (testing "splicing an integer"
-        (is (= 13
-               (spliced-count-of :venues [:= $price 3]))))
-      (testing "splicing floating-point numbers"
-        (is (= 13
-               (spliced-count-of :venues [:between $price 2.9 3.1]))))
-      (testing "splicing nil"
-        (is (= 0
-               (spliced-count-of :venues [:is-null $price])))))
-    (mt/dataset places-cam-likes
-      (mt/$ids places
-        (testing "splicing a boolean"
-          (is (= 2
-                 (spliced-count-of :places [:= $liked true]))))))
-    (mt/$ids checkins
-      (testing "splicing a date"
-        (is (= 3
-               (spliced-count-of :checkins [:= $date "2014-03-05"]))))))
+  (testing "`splice-parameters-into-native-query` should generate a query that works correctly"
+    (mt/test-drivers (sql-jdbc.tu/sql-jdbc-drivers)
+      (mt/$ids venues
+        (testing "splicing a string"
+          (is (= 3
+                 (spliced-count-of :venues [:starts-with $name "Sushi"])))
+          (testing "containing single quotes -- this is done differently from driver to driver"
+            (is (= 1
+                   (spliced-count-of :venues [:= $name "Barney's Beanery"])))))
+        (testing "splicing an integer"
+          (is (= 13
+                 (spliced-count-of :venues [:= $price 3]))))
+        (testing "splicing floating-point numbers"
+          (is (= 13
+                 (spliced-count-of :venues [:between $price 2.9 3.1]))))
+        (testing "splicing nil"
+          (is (= 0
+                 (spliced-count-of :venues [:is-null $price])))))
+      (mt/dataset places-cam-likes
+        (mt/$ids places
+          (testing "splicing a boolean"
+            (is (= 2
+                   (spliced-count-of :places [:= $liked true]))))))
+      (mt/$ids checkins
+        (testing "splicing a date"
+          (is (= 3
+                 (spliced-count-of :checkins [:= $date "2014-03-05"]))))))
 
-  ;; Oracle, Redshift, and SparkSQL don't have 'Time' types
-  (mt/test-drivers (disj (sql-jdbc.tu/sql-jdbc-drivers) :oracle :redshift :sparksql)
-    (testing "splicing a time"
-      (is (= 2
-             (mt/dataset test-data-with-time
-               (mt/$ids users
-                 (spliced-count-of :users [:= $last_login_time "09:30"]))))))))
+    ;; Oracle, Redshift, and SparkSQL don't have 'Time' types
+    (mt/test-drivers (disj (sql-jdbc.tu/sql-jdbc-drivers) :oracle :redshift :sparksql)
+      (testing "splicing a time"
+        (is (= 2
+               (mt/dataset test-data-with-time
+                 (mt/$ids users
+                   (spliced-count-of :users [:= $last_login_time "09:30"])))))))))

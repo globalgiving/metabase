@@ -16,7 +16,7 @@ import d3 from "d3";
 
 import L from "leaflet";
 
-import type { VisualizationProps } from "metabase/meta/types/Visualization";
+import type { VisualizationProps } from "metabase-types/types/Visualization";
 
 type Props = VisualizationProps;
 
@@ -159,8 +159,9 @@ export default class PinMap extends Component {
         t`We filtered out ${filteredRows} row(s) containing null values.`,
       );
     }
-    // $FlowFixMe flow thinks warnings can be undefined
-    onUpdateWarnings(warnings);
+    if (onUpdateWarnings && warnings) {
+      onUpdateWarnings(warnings);
+    }
 
     const bounds = L.latLngBounds(points);
 
