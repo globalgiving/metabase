@@ -235,3 +235,18 @@
 
   ([query info context]
    (process-query-and-save-execution! (add-default-constraints query) info context)))
+
+;;; +----------------------------------------------------------------------------------------------------------------+   
+;;; |                        UPKEEP-28988 Add support for higher max results in queries                              |
+;;; +----------------------------------------------------------------------------------------------------------------+    
+(defn- add-higher-default-constraints [query]
+  (assoc-in query [:middleware :add-higher-userland-constraints?] true))
+
+(s/defn process-query-and-save-with-higher-max-results-constraints!
+  "Same as `process-query-and-save-with-max-results-constraints!` but will include the higher max rows returned as a constraint. (This
+  function is ulitmately what powers most API endpoints that run queries, including `POST /api/dataset`.)"
+  ([query info]
+   (process-query-and-save-execution! (add-higher-default-constraints query) info))
+
+  ([query info context]
+   (process-query-and-save-execution! (add-higher-default-constraints query) info context)))

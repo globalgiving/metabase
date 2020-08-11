@@ -36,7 +36,7 @@
         (let [query (assoc query :async? false)]
           (session/with-current-user pulse-creator-id
             {:card   card
-             :result (qp/process-query-and-save-with-max-results-constraints!
+             :result (qp/process-query-and-save-with-higher-max-results-constraints!
                       query
                       (merge {:executed-by pulse-creator-id
                               :context     :pulse
