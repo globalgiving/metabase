@@ -37,7 +37,7 @@
       (when-let [{query :dataset_query, :as card} (Card :id card-id, :archived false)]
         (let [query         (assoc query :async? false)
               process-query (fn []
-                              (qp/process-query-and-save-with-max-results-constraints!
+                              (qp/process-query-and-save-with-higher-max-results-constraints!
                                query
                                (merge {:executed-by pulse-creator-id
                                        :context     :pulse
