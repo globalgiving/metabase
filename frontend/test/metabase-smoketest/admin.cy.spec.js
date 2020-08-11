@@ -108,11 +108,7 @@ describe("metabase-smoketest > admin", () => {
       cy.findAllByText("Created At")
         .last()
         .click();
-      cy.get("input[type='text']")
-        .wait(1)
-        .clear()
-        .wait(1)
-        .type("5");
+      cy.get("input[type='text']").type("{selectall}{del}5");
       cy.findByText("Days").click();
       cy.findByText("Years").click();
       sidebar()
@@ -161,6 +157,7 @@ describe("metabase-smoketest > admin", () => {
     });
 
     it("should add a simple JOINed question as admin", () => {
+      cy.visit("/");
       cy.findByText("Ask a question");
 
       cy.findByText("Ask a question").click();
@@ -200,6 +197,7 @@ describe("metabase-smoketest > admin", () => {
     });
 
     it("should add a question with a default line visualization as admin", () => {
+      cy.visit("/");
       cy.findByText("Ask a question").click();
 
       cy.findByText("Native query");
@@ -236,6 +234,7 @@ describe("metabase-smoketest > admin", () => {
     });
 
     it("should create a new dashboard with the previous questions as admin", () => {
+      cy.visit("/");
       // New dashboard
       cy.get(".Icon-add").click();
       cy.findByText("New dashboard").click();

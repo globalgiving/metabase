@@ -79,7 +79,7 @@ Open up the settings for your table and you'll see the Columns tab, which displa
 
 To hide a column, click the X icon on it; that'll send it down to the **More columns** area in case you want to bring it back. To add a linked column, just click the + icon on it, which will bring it to the **Visible columns** section. Click and drag any of the columns listed there to rearrange the order in which they appear. Another super easy way to rearrange columns without having to open up the visualization settings is to simply click and drag on a column's heading to move it where you'd like it to go.
 
-> Changing these options doesn't change the actual table itself; these changes create a custom view of the table that you can save as a **question** in Metabase and refer back to later, share with others, or add to a [dashboard](08-dashboards.md).
+> Changing these options doesn't change the actual table itself; these changes create a custom view of the table that you can save as a **question** in Metabase and refer back to later, share with others, or add to a [dashboard](07-dashboards.md).
 
 #### Column formatting options
 
@@ -213,7 +213,7 @@ There's quite a bit you can do in this tab, but the options available will depen
 
 There are three main ways to configure axes:
 
-- **Change the scale for your axes**. If you're looking at a time series chart, your x-axis can use a time series scale or an ordinal one. Your y-axis can use a linear, power, or logarithmic scale.
+- **Change the scale for your axes**. If you're looking at a time series chart, your x-axis can use a time series scale or an ordinal one. When using "Timeseries", it will always be displayed in ascending order, so oldest to newest, while "Ordinal" will display in the order the data is returned. Your y-axis can use a linear, power, or logarithmic scale.
 - **Hide or show the tick marks on your axes**. You can also choose to rotate the tick marks on the x-axis to help them fit better.
 - **Edit the range of your y-axis**. Metabase sets an automatic range by default, but you can toggle that off and input a custom minimum and maximum value for the y-axis if you'd like.
 
