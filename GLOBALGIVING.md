@@ -1,4 +1,4 @@
-# Building, Running, and Deploy GlobalGiving's Forked Metabase
+# Build, Run, and Deploy GlobalGiving's Forked Metabase
 
 
 ## Building Locally
@@ -7,28 +7,38 @@ See also https://www.metabase.com/docs/latest/developers-guide.html
 
     ./bin/build
 
-#$ Create, tag, and push Docker image
+## Create, tag, and push Docker image
 
     docker build -t globalgiving/metabase:v0.36.2.1 .
     docker push globalgiving/metabase:v0.36.2.1
 
-## Deploy Locally
+## Run Locally
 
     docker run -d -p 3000:3000 --name metabase globalgiving/metabase:v0.36.2.1
 
 ## Deploy to Production
 
+### Update Docker Image
+
+You must update the Docker image via command line to deploy.
+
+    ssh-add ~/.ssh/Metabase.pem
+    ssh bastion.cl.globalgiving.org
+    ssh metabase
+    docker pull globalgiving/metabase:v0.36.2.1
+    docker stop metabase
+    docker rm metabase
+    ## Note - full command is available on `/cdk-infrastructure/globalgiving/user-data-scripts/metabase-server.sh.j2`
+    docker run -d -p 50000:3000 -e ..... globalgiving/metabase:v0.36.2.1
+
 ### Update CDK to use new Docker Image
 
-Edit `/cdk-infrastructure/globalgiving/user-data-scripts/metabase-server.sh.j2`
+Although you've deployed manually, you should also update CDK so that if the EC2 instance dies or is recreated, it will properly reload metabase. 
 
-Specifically, update lines 33 & 34 to update the version tag to whatever the most recent is. For example (truncated):
+Edit `/cdk-infrastructure/globalgiving/user-data-scripts/metabase-server.sh.j2`. Specifically, update lines 33 & 34 to update the version tag to whatever the most recent is. For example (truncated):
 
     docker pull globalgiving/metabase:v0.36.2.1
     docker run -d -p 50000:3000 -e ..... globalgiving/metabase:v0.36.2.1
-
-
-### Deploy CDK Changes
 
 Then, per instructions in `cdk-infrastructure`:
 
