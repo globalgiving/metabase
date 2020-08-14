@@ -1,11 +1,11 @@
 # Build, Run, and Deploy GlobalGiving's Forked Metabase
 
-
 ## Building Locally
 
 See also https://www.metabase.com/docs/latest/developers-guide.html
 
-    ./bin/build
+    export JAVAC=/Users/kconroy/.sdkman/candidates/java/current/bin/javac
+    ./bin/build no-translations
 
 ## Create, tag, and push Docker image
 
@@ -16,7 +16,10 @@ See also https://www.metabase.com/docs/latest/developers-guide.html
 
     docker run -d -p 3000:3000 --name metabase globalgiving/metabase:v0.38.0.1
     
-For more on running a local copy of our fork for ETL/data stack testing purposes, [see the ETL docs](https://github.com/globalgiving/etl#exploring-etled-data-locally-via-metabase)
+It should come up at [http://localhost:3000/](http://localhost:3000/)
+
+For more on running a local copy of our fork for ETL/data stack testing purposes, [see the ETL docs](https://github.com/globalgiving/etl#exploring-etled-data-locally-via-metabase).
+
 
 ## Deploy to Production
 
