@@ -15,6 +15,8 @@ See also https://www.metabase.com/docs/latest/developers-guide.html
 ## Run Locally
 
     docker run -d -p 3000:3000 --name metabase globalgiving/metabase:v0.36.2.1
+    
+For more on running a local copy of our fork for ETL/data stack testing purposes, [see the ETL docs](https://github.com/globalgiving/etl#exploring-etled-data-locally-via-metabase)
 
 ## Deploy to Production
 
