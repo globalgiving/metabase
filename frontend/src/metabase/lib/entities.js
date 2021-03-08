@@ -1,5 +1,3 @@
-/* @flow */
-
 import {
   combineReducers,
   handleEntities,
@@ -410,6 +408,9 @@ export function createEntity(def: EntityDefinition): Entity {
       // contains the actual entries, if that is on the response we should
       // use that as the 'results'
       const results = fetched.data ? fetched.data : fetched;
+      if (!Array.isArray(results)) {
+        throw `Invalid response listing ${entity.name}`;
+      }
       return {
         ...entity.normalizeList(results),
         entityQuery,
@@ -553,6 +554,9 @@ export function createEntity(def: EntityDefinition): Entity {
     },
     getColor(object) {
       return undefined;
+    },
+    getCollection(object) {
+      return object.collection;
     },
     ...(def.objectSelectors || {}),
   };

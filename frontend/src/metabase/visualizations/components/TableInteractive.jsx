@@ -1,5 +1,3 @@
-/* @flow */
-
 import React, { Component } from "react";
 import PropTypes from "prop-types";
 import ReactDOM from "react-dom";
@@ -47,7 +45,7 @@ import type {
   ClickObject,
 } from "metabase-types/types/Visualization";
 import type { VisualizationSettings } from "metabase-types/types/Card";
-import type { DatasetData } from "metabase-types/types/Dataset";
+import type { DatasetData, Value } from "metabase-types/types/Dataset";
 
 function pickRowsToMeasure(rows, columnIndex, count = 10) {
   const rowIndexes = [];
@@ -144,11 +142,13 @@ export default class TableInteractive extends Component {
       <div className="cellData">{children}</div>
     ),
     renderTableCellWrapper: children => (
-      <div className="cellData">{children}</div>
+      <div className={cx({ cellData: children != null && children !== "" })}>
+        {children}
+      </div>
     ),
   };
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     // for measuring cells:
     this._div = document.createElement("div");
     this._div.className = "TableInteractive";
@@ -167,7 +167,7 @@ export default class TableInteractive extends Component {
     }
   }
 
-  componentWillReceiveProps(newProps: Props) {
+  UNSAFE_componentWillReceiveProps(newProps: Props) {
     if (
       this.props.data &&
       newProps.data &&
@@ -335,6 +335,7 @@ export default class TableInteractive extends Component {
     try {
       return this._getCellClickedObjectCached(
         this.props.data,
+        this.props.settings,
         rowIndex,
         columnIndex,
         this.props.isPivoted,
@@ -347,11 +348,18 @@ export default class TableInteractive extends Component {
   @memoize
   _getCellClickedObjectCached(
     data: DatasetData,
+    settings: VisualizationSettings,
     rowIndex: number,
     columnIndex: number,
     isPivoted: boolean,
   ) {
-    return getTableCellClickedObject(data, rowIndex, columnIndex, isPivoted);
+    return getTableCellClickedObject(
+      data,
+      settings,
+      rowIndex,
+      columnIndex,
+      isPivoted,
+    );
   }
 
   getHeaderClickedObject(columnIndex: number) {

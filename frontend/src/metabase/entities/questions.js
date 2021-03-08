@@ -1,5 +1,3 @@
-/* @flow */
-
 import { assocIn } from "icepick";
 import { t } from "ttag";
 
@@ -10,6 +8,7 @@ import { color } from "metabase/lib/colors";
 import {
   canonicalCollectionId,
   getCollectionType,
+  normalizedCollection,
 } from "metabase/entities/collections";
 
 import { POST, DELETE } from "metabase/lib/api";
@@ -19,6 +18,7 @@ const UNFAVORITE_ACTION = `metabase/entities/questions/UNFAVORITE`;
 
 const Questions = createEntity({
   name: "questions",
+  nameOne: "question",
   path: "/api/card",
 
   api: {
@@ -66,6 +66,8 @@ const Questions = createEntity({
     getName: question => question && question.name,
     getUrl: question => question && Urls.question(question.id),
     getColor: () => color("text-medium"),
+    getCollection: question =>
+      question && normalizedCollection(question.collection),
     getIcon: question =>
       (require("metabase/visualizations").default.get(question.display) || {})
         .iconName || "beaker",

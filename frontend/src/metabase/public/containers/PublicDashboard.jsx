@@ -1,5 +1,3 @@
-/* @flow */
-
 import React, { Component } from "react";
 import { connect } from "react-redux";
 import { push } from "react-router-redux";
@@ -12,6 +10,7 @@ import DashboardGrid from "metabase/dashboard/components/DashboardGrid";
 import DashboardControls from "metabase/dashboard/hoc/DashboardControls";
 import { getDashboardActions } from "metabase/dashboard/components/DashboardActions";
 import EmbedFrame from "../components/EmbedFrame";
+import title from "metabase/hoc/Title";
 
 import { fetchDatabaseMetadata } from "metabase/redux/metadata";
 import { setErrorPage } from "metabase/redux/app";
@@ -88,13 +87,13 @@ type Props = {
   mapStateToProps,
   mapDispatchToProps,
 )
+@title(({ dashboard }) => dashboard && dashboard.name)
 @DashboardControls
 // NOTE: this should use DashboardData HoC
 export default class PublicDashboard extends Component {
   props: Props;
 
-  // $FlowFixMe
-  async componentWillMount() {
+  async UNSAFE_componentWillMount() {
     const {
       initialize,
       fetchDashboard,
@@ -105,9 +104,9 @@ export default class PublicDashboard extends Component {
     } = this.props;
 
     if (uuid) {
-      setPublicDashboardEndpoints(uuid);
+      setPublicDashboardEndpoints();
     } else if (token) {
-      setEmbedDashboardEndpoints(token);
+      setEmbedDashboardEndpoints();
     }
 
     initialize();
@@ -125,7 +124,7 @@ export default class PublicDashboard extends Component {
     this.props.cancelFetchDashboardCardData();
   }
 
-  componentWillReceiveProps(nextProps: Props) {
+  UNSAFE_componentWillReceiveProps(nextProps: Props) {
     if (!_.isEqual(this.props.parameterValues, nextProps.parameterValues)) {
       this.props.fetchDashboardCardData({ reload: false, clear: true });
     }
@@ -139,12 +138,15 @@ export default class PublicDashboard extends Component {
       isFullscreen,
       isNightMode,
     } = this.props;
-    const buttons = !IFRAMED ? getDashboardActions(this.props) : [];
+    const buttons = !IFRAMED
+      ? getDashboardActions(this, { ...this.props, isPublic: true })
+      : [];
 
     return (
       <EmbedFrame
         name={dashboard && dashboard.name}
         description={dashboard && dashboard.description}
+        dashboard={dashboard}
         parameters={parameters}
         parameterValues={parameterValues}
         setParameterValue={this.props.setParameterValue}

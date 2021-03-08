@@ -1,5 +1,3 @@
-/* @flow weak */
-
 // NOTE: this needs to be imported first due to some cyclical dependency nonsense
 import Question from "../Question";
 
@@ -54,6 +52,15 @@ export default class Table extends Base {
       tableId: this.id,
       metadata: this.metadata,
     });
+  }
+
+  isSavedQuestion(): boolean {
+    return this.savedQuestionId() !== null;
+  }
+
+  savedQuestionId() {
+    const match = String(this.id).match(/card__(\d+)/);
+    return match ? parseInt(match[1]) : null;
   }
 
   query(query = {}): StructuredQuery {

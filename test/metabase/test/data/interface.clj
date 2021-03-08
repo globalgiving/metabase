@@ -9,31 +9,27 @@
             [clojure.tools.reader.edn :as edn]
             [environ.core :refer [env]]
             [medley.core :as m]
-            [metabase
-             [db :as mdb]
-             [driver :as driver]
-             [query-processor :as qp]
-             [util :as u]]
-            [metabase.models
-             [database :refer [Database]]
-             [field :as field :refer [Field]]
-             [table :refer [Table]]]
+            [metabase.db :as mdb]
+            [metabase.driver :as driver]
+            [metabase.models.database :refer [Database]]
+            [metabase.models.field :as field :refer [Field]]
+            [metabase.models.table :refer [Table]]
             [metabase.plugins.classloader :as classloader]
+            [metabase.query-processor :as qp]
             [metabase.test.initialize :as initialize]
-            [metabase.util
-             [date-2 :as u.date]
-             [schema :as su]]
+            [metabase.util :as u]
+            [metabase.util.date-2 :as u.date]
+            [metabase.util.schema :as su]
             [potemkin.types :as p.types]
             [pretty.core :as pretty]
             [schema.core :as s]
-            [toucan.db :as db])
-  (:import clojure.lang.Keyword))
+            [toucan.db :as db]))
 
 ;;; +----------------------------------------------------------------------------------------------------------------+
 ;;; |                                   Dataset Definition Record Types & Protocol                                   |
 ;;; +----------------------------------------------------------------------------------------------------------------+
 
-(p.types/defrecord+ FieldDefinition [field-name base-type special-type visibility-type fk field-comment])
+(p.types/defrecord+ FieldDefinition [field-name base-type semantic-type visibility-type fk field-comment])
 
 (p.types/defrecord+ TableDefinition [table-name field-definitions rows table-comment])
 
@@ -42,9 +38,9 @@
 (def ^:private FieldDefinitionSchema
   {:field-name                       su/NonBlankString
    :base-type                        (s/cond-pre {:native su/NonBlankString} su/FieldType)
-   (s/optional-key :special-type)    (s/maybe su/FieldType)
+   (s/optional-key :semantic-type)   (s/maybe su/FieldType)
    (s/optional-key :visibility-type) (s/maybe (apply s/enum field/visibility-types))
-   (s/optional-key :fk)              (s/maybe s/Keyword)
+   (s/optional-key :fk)              (s/maybe su/KeywordOrString)
    (s/optional-key :field-comment)   (s/maybe su/NonBlankString)})
 
 (def ^:private ValidFieldDefinition
@@ -170,7 +166,7 @@
   []
   (the-driver-with-test-extensions (or driver/*driver* :h2)))
 
-(defn escaped-name
+(defn escaped-database-name
   "Return escaped version of database name suitable for use as a filename / database name / etc."
   ^String [^DatabaseDefinition {:keys [database-name]}]
   {:pre [(string? database-name)]}
@@ -258,16 +254,20 @@
   dispatch-on-driver-with-test-extensions
   :hierarchy #'driver/hierarchy)
 
-
 (defmulti create-db!
   "Create a new database from `database-definition`, including adding tables, fields, and foreign key constraints,
-  and add the appropriate data. This method should drop existing databases with the same name if applicable, unless
-  the skip-drop-db? arg is true. This is to workaround a scenario where the postgres driver terminates the connection
-  before dropping the DB and causes some tests to fail. (This refers to creating the actual *DBMS* database itself,
-  *not* a Metabase `Database` object.)
+  and load the appropriate data. (This refers to creating the actual *DBMS* database itself, *not* a Metabase
+  `Database` object.)
 
   Optional `options` as third param. Currently supported options include `skip-drop-db?`. If unspecified,
-  `skip-drop-db?` should default to `false`."
+  `skip-drop-db?` should default to `false`.
+
+  This method should drop existing databases with the same name if applicable, unless the `skip-drop-db?` arg is
+  truthy. This is to work around a scenario where the Postgres driver terminates the connection before dropping the DB
+  and causes some tests to fail.
+
+  This method is not expected to return anything; use `dbdef->connection-details` to get connection details for this
+  database after you create it."
   {:arglists '([driver database-definition & {:keys [skip-drop-db?]}])}
   dispatch-on-driver-with-test-extensions
   :hierarchy #'driver/hierarchy)
@@ -332,12 +332,12 @@
   ([_ aggregation-type]
    ;; TODO - Can `:cum-count` be used without args as well ??
    (assert (= aggregation-type :count))
-   {:base_type    :type/BigInteger
-    :special_type :type/Number
-    :name         "count"
-    :display_name "Count"
-    :source       :aggregation
-    :field_ref    [:aggregation 0]})
+   {:base_type     :type/BigInteger
+    :semantic_type :type/Number
+    :name          "count"
+    :display_name  "Count"
+    :source        :aggregation
+    :field_ref     [:aggregation 0]})
 
   ([driver aggregation-type {field-id :id, table-id :table_id}]
    {:pre [(some? table-id)]}

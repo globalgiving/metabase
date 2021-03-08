@@ -1,5 +1,3 @@
-/* @flow */
-
 import React, { Component } from "react";
 import { t } from "ttag";
 import ChoroplethMap, {
@@ -24,7 +22,6 @@ import {
   fieldSetting,
 } from "metabase/visualizations/lib/settings/utils";
 import { columnSettings } from "metabase/visualizations/lib/settings/column";
-import { PLUGIN_CHART_SETTINGS } from "metabase/plugins";
 
 import MetabaseSettings from "metabase/lib/settings";
 
@@ -109,7 +106,7 @@ export default class Map extends Component {
         ],
         cols: [
           {
-            special_type: "type/State",
+            semantic_type: "type/State",
             name: "STATE",
             source: "breakout",
             display_name: "State",
@@ -117,7 +114,7 @@ export default class Map extends Component {
           },
           {
             base_type: "type/Integer",
-            special_type: "type/Number",
+            semantic_type: "type/Number",
             name: "count",
             display_name: "count",
             source: "aggregation",
@@ -238,10 +235,11 @@ export default class Map extends Component {
         return null;
       },
       getProps: () => ({
-        options: Object.entries(MetabaseSettings.get("custom-geojson", {})).map(
-          // $FlowFixMe:
-          ([key, value]) => ({ name: value.name, value: key }),
-        ),
+        options: _.chain(MetabaseSettings.get("custom-geojson", {}))
+          .pairs()
+          .map(([key, value]) => ({ name: value.name || "", value: key }))
+          .sortBy(x => x.name.toLowerCase())
+          .value(),
       }),
       getHidden: (series, vizSettings) => vizSettings["map.type"] !== "region",
     },
@@ -293,7 +291,6 @@ export default class Map extends Component {
       default: 1,
       getHidden: (series, vizSettings) => vizSettings["map.type"] !== "heat",
     },
-    ...PLUGIN_CHART_SETTINGS,
   };
 
   static checkRenderable([{ data }], settings) {

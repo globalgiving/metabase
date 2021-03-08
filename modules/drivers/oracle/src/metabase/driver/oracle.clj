@@ -3,26 +3,24 @@
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [honeysql.core :as hsql]
+            [honeysql.format :as hformat]
             [java-time :as t]
             [metabase.driver :as driver]
-            [metabase.driver
-             [common :as driver.common]
-             [sql :as sql]]
-            [metabase.driver.sql
-             [query-processor :as sql.qp]
-             [util :as sql.u]]
-            [metabase.driver.sql-jdbc
-             [connection :as sql-jdbc.conn]
-             [execute :as sql-jdbc.execute]
-             [sync :as sql-jdbc.sync]]
+            [metabase.driver.common :as driver.common]
+            [metabase.driver.sql :as sql]
+            [metabase.driver.sql-jdbc.connection :as sql-jdbc.conn]
+            [metabase.driver.sql-jdbc.execute :as sql-jdbc.execute]
+            [metabase.driver.sql-jdbc.sync :as sql-jdbc.sync]
+            [metabase.driver.sql.query-processor :as sql.qp]
+            [metabase.driver.sql.util :as sql.u]
             [metabase.driver.sql.util.unprepare :as unprepare]
-            [metabase.util
-             [honeysql-extensions :as hx]
-             [i18n :refer [trs]]
-             [ssh :as ssh]])
+            [metabase.util.honeysql-extensions :as hx]
+            [metabase.util.i18n :refer [trs]]
+            [metabase.util.ssh :as ssh])
   (:import com.mchange.v2.c3p0.C3P0ProxyConnection
            [java.sql Connection ResultSet Types]
            [java.time Instant OffsetDateTime ZonedDateTime]
+           metabase.util.honeysql_extensions.Identifier
            [oracle.jdbc OracleConnection OracleTypes]
            oracle.sql.TIMESTAMPTZ))
 
@@ -83,8 +81,12 @@
 
 (defmethod driver/can-connect? :oracle
   [driver details]
-  (let [connection (sql-jdbc.conn/connection-details->spec driver (ssh/include-ssh-tunnel details))]
+  (let [connection (sql-jdbc.conn/connection-details->spec driver (ssh/include-ssh-tunnel! details))]
     (= 1M (first (vals (first (jdbc/query connection ["SELECT 1 FROM dual"])))))))
+
+(defmethod driver/db-start-of-week :oracle
+  [_]
+  :sunday)
 
 (defn- trunc
   "Truncate a date. See also this [table of format
@@ -102,9 +104,7 @@
 (defmethod sql.qp/date [:oracle :day]            [_ _ v] (trunc :dd v))
 (defmethod sql.qp/date [:oracle :day-of-month]   [_ _ v] (hsql/call :extract :day v))
 ;; [SIC] The format template for truncating to start of week is 'day' in Oracle #WTF
-;; iw = same day of the week as first day of the ISO year
-;; iy = ISO year
-(defmethod sql.qp/date [:oracle :week]           [_ _ v] (trunc :day v))
+(defmethod sql.qp/date [:oracle :week]           [_ _ v] (sql.qp/adjust-start-of-week :oracle (partial trunc :day) v))
 (defmethod sql.qp/date [:oracle :month]          [_ _ v] (trunc :month v))
 (defmethod sql.qp/date [:oracle :month-of-year]  [_ _ v] (hsql/call :extract :month v))
 (defmethod sql.qp/date [:oracle :quarter]        [_ _ v] (trunc :q v))
@@ -113,11 +113,6 @@
 (defmethod sql.qp/date [:oracle :day-of-year] [driver _ v]
   (hx/inc (hx/- (sql.qp/date driver :day v) (trunc :year v))))
 
-(defmethod sql.qp/date [:oracle :week-of-year] [_ _ v]
-  (hx/inc (hx// (hx/- (trunc :iw v)
-                      (trunc :iy v))
-                7)))
-
 (defmethod sql.qp/date [:oracle :quarter-of-year] [driver _ v]
   (hx// (hx/+ (sql.qp/date driver :month-of-year (sql.qp/date driver :quarter v))
               2)
@@ -125,8 +120,7 @@
 
 ;; subtract number of days between today and first day of week, then add one since first day of week = 1
 (defmethod sql.qp/date [:oracle :day-of-week] [driver _ v]
-  (hx/inc (hx/- (sql.qp/date driver :day v)
-                (sql.qp/date driver :week v))))
+  (sql.qp/adjust-day-of-week :oracle (hx/->integer (hsql/call :to_char v (hx/literal :d)))))
 
 (def ^:private now (hsql/raw "SYSDATE"))
 
@@ -135,6 +129,30 @@
 (defn- num-to-ds-interval [unit v] (hsql/call :numtodsinterval v (hx/literal unit)))
 (defn- num-to-ym-interval [unit v] (hsql/call :numtoyminterval v (hx/literal unit)))
 
+(def ^:private legacy-max-identifier-length
+  "Maximal identifier length for Oracle < 12.2"
+  30)
+
+(defn- truncate-identifier
+  [identifier]
+  (->> identifier
+       hash
+       str
+       (map (fn [digit]
+              (-> digit
+                  int
+                  (+ 65)
+                  char)))
+       (apply str "identifier_")))
+
+(defmethod sql.qp/->honeysql [:oracle Identifier]
+  [_ identifier]
+  (let [field-identifier (last (:components identifier))]
+    (if (> (count field-identifier) legacy-max-identifier-length)
+      (update identifier :components (fn [components]
+                                       (concat (butlast components)
+                                               [(truncate-identifier field-identifier)])))
+      identifier)))
 
 (defmethod sql.qp/->honeysql [:oracle :substring]
   [driver [_ arg start length]]
@@ -171,9 +189,21 @@
   (hx/+ (hsql/raw "timestamp '1970-01-01 00:00:00 UTC'")
         (num-to-ds-interval :second field-or-value)))
 
+(defmethod sql.qp/cast-temporal-string [:oracle :type/ISO8601DateTimeString]
+  [_driver _semantic_type expr]
+  (hsql/call :to_timestamp expr "YYYY-MM-DD HH:mi:SS"))
+
+(defmethod sql.qp/cast-temporal-string [:oracle :type/ISO8601DateString]
+  [_driver _semantic_type expr]
+  (hsql/call :to_date expr "YYYY-MM-DD"))
+
 (defmethod sql.qp/unix-timestamp->honeysql [:oracle :milliseconds]
   [driver _ field-or-value]
   (sql.qp/unix-timestamp->honeysql driver :seconds (hx// field-or-value (hsql/raw 1000))))
+
+(defmethod sql.qp/unix-timestamp->honeysql [:oracle :microseconds]
+  [driver _ field-or-value]
+  (sql.qp/unix-timestamp->honeysql driver :seconds (hx// field-or-value (hsql/raw 1000000))))
 
 ;; Oracle doesn't support `LIMIT n` syntax. Instead we have to use `WHERE ROWNUM <= n` (`NEXT n ROWS ONLY` isn't
 ;; supported on Oracle versions older than 12). This has to wrap the actual query, e.g.
@@ -203,7 +233,7 @@
 ;; )
 ;; WHERE __rownum__ >= 100;
 ;;
-;; See issue #3568 and the Oracle documentation for more details:
+;; See metabase#3568 and the Oracle documentation for more details:
 ;; http://docs.oracle.com/cd/B19306_01/server.102/b14200/pseudocolumns009.htm
 (defmethod sql.qp/apply-top-level-clause [:oracle :limit]
   [_ _ honeysql-query {value :limit}]
@@ -305,6 +335,10 @@
       "XDB"
       "XS$NULL"}))
 
+(defmethod driver/escape-entity-name-for-metadata :oracle
+  [_ entity-name]
+  (str/replace entity-name "/" "//"))
+
 (defmethod sql-jdbc.execute/set-timezone-sql :oracle
   [_]
   "ALTER session SET time_zone = %s")
@@ -325,6 +359,22 @@
       (catch Throwable e
         (.close stmt)
         (throw e)))))
+
+;; similar rationale to prepared-statement above
+(defmethod sql-jdbc.execute/statement :oracle
+   [_ ^Connection conn]
+   (let [stmt (.createStatement conn
+                                ResultSet/TYPE_FORWARD_ONLY
+                                ResultSet/CONCUR_READ_ONLY)]
+        (try
+          (try
+            (.setFetchDirection stmt ResultSet/FETCH_FORWARD)
+            (catch Throwable e
+              (log/debug e (trs "Error setting result set fetch direction to FETCH_FORWARD"))))
+          stmt
+          (catch Throwable e
+            (.close stmt)
+            (throw e)))))
 
 ;; instead of returning a CLOB object, return the String. (#9026)
 (defmethod sql-jdbc.execute/read-column-thunk [:oracle Types/CLOB]

@@ -1,5 +1,3 @@
-/* @flow weak */
-
 import React, { Component } from "react";
 import { t } from "ttag";
 
@@ -20,6 +18,8 @@ import type Table from "metabase-lib/lib/metadata/Table";
 import type { DatasetQuery } from "metabase-types/types/Card";
 
 import type { ParameterValues } from "metabase-types/types/Parameter";
+
+import { HARD_ROW_LIMIT } from "metabase/lib/query";
 
 type Props = {
   question: Question,
@@ -62,7 +62,7 @@ export default class QueryVisualization extends Component {
 
   static defaultProps = {
     // NOTE: this should be more dynamic from the backend, it's set based on the query lang
-    maxTableRows: 2000,
+    maxTableRows: HARD_ROW_LIMIT,
   };
 
   _getStateFromProps(props) {
@@ -72,7 +72,7 @@ export default class QueryVisualization extends Component {
     };
   }
 
-  componentWillReceiveProps(nextProps) {
+  UNSAFE_componentWillReceiveProps(nextProps) {
     // whenever we are told that we are running a query lets update our understanding of the "current" query
     if (nextProps.isRunning) {
       this.setState(this._getStateFromProps(nextProps));

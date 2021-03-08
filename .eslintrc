@@ -16,12 +16,12 @@
     "react/no-did-mount-set-state": 0,
     "react/no-did-update-set-state": 0,
     "react/no-find-dom-node": 0,
-    "flowtype/define-flow-type": 1,
-    "flowtype/use-flow-type": 1,
-    "prefer-const": [1, { "destructuring": "all" }]
+    "prefer-const": [1, { "destructuring": "all" }],
+    "no-useless-escape": 0
   },
   "globals": {
     "pending": false,
+    "before": true,
     "cy": true,
     "Cypress": true
   },
@@ -32,15 +32,24 @@
     "jest": true
   },
   "parser": "babel-eslint",
-  "plugins": ["react", "flowtype"],
+  "plugins": ["react"],
   "extends": [
     "eslint:recommended",
     "plugin:react/recommended",
+    "plugin:react-hooks/recommended",
     "plugin:import/errors",
     "plugin:import/warnings"
   ],
   "settings": {
     "import/resolver": "webpack",
-    "import/ignore": ["\\.css$"]
+    "import/ignore": ["\\.css$"],
+    "react": {
+      "version": "detect"
+    }
+  },
+  "parserOptions": {
+    "ecmaFeatures": {
+      "legacyDecorators": true
+    }
   }
 }

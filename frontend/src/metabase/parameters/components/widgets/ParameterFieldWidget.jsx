@@ -1,5 +1,3 @@
-/* @flow */
-
 import React, { Component } from "react";
 import ReactDOM from "react-dom";
 
@@ -12,6 +10,9 @@ import Value from "metabase/components/Value";
 
 import Field from "metabase-lib/lib/metadata/Field";
 
+import type { Parameter } from "metabase-types/types/Parameter";
+import type { DashboardWithCards } from "metabase-types/types/Dashboard";
+
 type Props = {
   value: any,
   setValue: () => void,
@@ -20,6 +21,10 @@ type Props = {
 
   fields: Field[],
   parentFocusChanged: boolean => void,
+
+  dashboard?: DashboardWithCards,
+  parameter?: Parameter,
+  parameters?: Parameter[],
 };
 
 type State = {
@@ -38,7 +43,7 @@ export default class ParameterFieldWidget extends Component<*, Props, State> {
   props: Props;
   state: State;
 
-  _unfocusedElement: React$Component<any, any, any>;
+  _unfocusedElement: React.Component;
 
   constructor(props: Props) {
     super(props);
@@ -69,7 +74,7 @@ export default class ParameterFieldWidget extends Component<*, Props, State> {
     }
   }
 
-  componentWillReceiveProps(nextProps: Props) {
+  UNSAFE_componentWillReceiveProps(nextProps: Props) {
     if (this.props.value !== nextProps.value) {
       this.setState({ value: nextProps.value });
     }
@@ -135,6 +140,9 @@ export default class ParameterFieldWidget extends Component<*, Props, State> {
         >
           <FieldValuesWidget
             value={unsavedValue}
+            parameter={this.props.parameter}
+            parameters={this.props.parameters}
+            dashboard={this.props.dashboard}
             onChange={value => {
               this.setState({ value });
             }}

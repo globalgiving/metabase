@@ -69,6 +69,8 @@ export default class ParameterValueWidget extends Component {
     focusChanged: PropTypes.func,
     isFullscreen: PropTypes.bool,
     className: PropTypes.string,
+    parameters: PropTypes.array,
+    dashboard: PropTypes.object,
 
     // provided by @connect
     values: PropTypes.array,
@@ -88,7 +90,9 @@ export default class ParameterValueWidget extends Component {
     if (!metadata) {
       return [];
     }
-    return this.fieldIds(this.props).map(id => metadata.field(id));
+    return this.fieldIds(this.props)
+      .map(id => metadata.field(id))
+      .filter(f => f != null);
   }
 
   getWidget() {
@@ -104,7 +108,7 @@ export default class ParameterValueWidget extends Component {
 
   state = { isFocused: false };
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     // In public dashboards we receive field values before mounting this component and
     // without need to call `fetchFieldValues` separately
     if (_.isEmpty(this.props.values)) {
@@ -116,7 +120,7 @@ export default class ParameterValueWidget extends Component {
     return field_id ? [field_id] : field_ids;
   }
 
-  componentWillReceiveProps(nextProps) {
+  UNSAFE_componentWillReceiveProps(nextProps) {
     if (!_.isEqual(this.fieldIds(this.props), this.fieldIds(nextProps))) {
       this.updateFieldValues(nextProps);
     }
@@ -225,6 +229,9 @@ export default class ParameterValueWidget extends Component {
         >
           {getParameterTypeIcon()}
           <Widget
+            parameter={parameter}
+            parameters={this.props.parameters}
+            dashboard={this.props.dashboard}
             placeholder={placeholder}
             value={value}
             values={values}

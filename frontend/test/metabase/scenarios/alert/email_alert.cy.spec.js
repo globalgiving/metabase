@@ -6,7 +6,7 @@ import {
 
 function setUpHourlyAlert(question_num) {
   cy.visit(`/question/${question_num}`);
-  cy.get(".Icon-bell").click();
+  cy.icon("bell").click();
   cy.findByText("Set up an alert").click();
   cy.findByText("Daily").click();
   cy.findByText("Hourly").click();
@@ -51,7 +51,7 @@ describe("scenarios > alert > email_alert", () => {
       });
     });
 
-    it("should have email alerts toggled off (Issue #12349)", () => {
+    it("should have email alerts toggled off (metabase#12349)", () => {
       // Turn off email alerts during alert setup
       setUpHourlyAlert(2);
       cy.findByText("Email")

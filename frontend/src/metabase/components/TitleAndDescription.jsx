@@ -1,4 +1,3 @@
-/* @flow */
 import React from "react";
 import cx from "classnames";
 import pure from "recompose/pure";
@@ -16,7 +15,7 @@ const TitleAndDescription = ({ title, description, className }: Attributes) => (
     <h2 className="h2 mr1 text-wrap">{title}</h2>
     {description && (
       <Tooltip tooltip={description} maxWidth={"22em"}>
-        <Icon name="info" style={{ marginTop: 3 }} />
+        <Icon name="info" className="mx1" />
       </Tooltip>
     )}
   </div>

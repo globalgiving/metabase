@@ -2,10 +2,9 @@
   "Common test extension functionality for all SQL drivers."
   (:require [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [metabase
-             [driver :as driver]
-             [query-processor :as qp]]
+            [metabase.driver :as driver]
             [metabase.driver.sql.util :as sql.u]
+            [metabase.query-processor :as qp]
             [metabase.test.data :as data]
             [metabase.test.data.interface :as tx])
   (:import metabase.test.data.interface.FieldDefinition))
@@ -173,7 +172,6 @@
   tx/dispatch-on-driver-with-test-extensions
   :hierarchy #'driver/hierarchy)
 
-
 (defmulti create-db-sql
   "Return a `CREATE DATABASE` statement."
   {:arglists '([driver dbdef])}
@@ -183,7 +181,6 @@
 (defmethod create-db-sql :sql/test-extensions [driver {:keys [database-name]}]
   (format "CREATE DATABASE %s;" (qualify-and-quote driver database-name)))
 
-
 (defmulti drop-db-if-exists-sql
   "Return a `DROP DATABASE` statement."
   {:arglists '([driver dbdef])}
@@ -192,7 +189,6 @@
 
 (defmethod drop-db-if-exists-sql :sql/test-extensions [driver {:keys [database-name]}]
   (format "DROP DATABASE IF EXISTS %s;" (qualify-and-quote driver database-name)))
-
 
 (defmulti create-table-sql
   "Return a `CREATE TABLE` statement."

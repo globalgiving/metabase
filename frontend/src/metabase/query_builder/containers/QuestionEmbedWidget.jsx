@@ -1,5 +1,3 @@
-/* @flow */
-
 import React, { Component } from "react";
 import { connect } from "react-redux";
 
@@ -59,6 +57,7 @@ export default class QuestionEmbedWidget extends Component {
         getPublicUrl={({ public_uuid }, extension) =>
           Urls.publicQuestion(public_uuid, extension)
         }
+        extensions={Urls.exportFormats}
       />
     );
   }

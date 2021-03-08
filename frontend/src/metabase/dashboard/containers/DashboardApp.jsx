@@ -1,8 +1,7 @@
-/* @flow */
-
 import React, { Component } from "react";
 import { connect } from "react-redux";
 import { push } from "react-router-redux";
+import fitViewport from "metabase/hoc/FitViewPort";
 import title from "metabase/hoc/Title";
 import titleWithLoadingTime from "metabase/hoc/TitleWithLoadingTime";
 
@@ -13,6 +12,8 @@ import { setErrorPage } from "metabase/redux/app";
 
 import {
   getIsEditing,
+  getIsSharing,
+  getDashboardBeforeEditing,
   getIsEditingParameter,
   getIsDirty,
   getDashboardComplete,
@@ -22,6 +23,8 @@ import {
   getParameters,
   getParameterValues,
   getLoadingStartTime,
+  getClickBehaviorSidebarDashcard,
+  getIsAddParameterPopoverOpen,
 } from "../selectors";
 import { getDatabases, getMetadata } from "metabase/selectors/metadata";
 import { getUserIsAdmin } from "metabase/selectors/user";
@@ -37,6 +40,8 @@ const mapStateToProps = (state, props) => {
 
     isAdmin: getUserIsAdmin(state, props),
     isEditing: getIsEditing(state, props),
+    isSharing: getIsSharing(state, props),
+    dashboardBeforeEditing: getDashboardBeforeEditing(state, props),
     isEditingParameter: getIsEditingParameter(state, props),
     isDirty: getIsDirty(state, props),
     dashboard: getDashboardComplete(state, props),
@@ -48,6 +53,8 @@ const mapStateToProps = (state, props) => {
     parameterValues: getParameterValues(state, props),
     metadata: getMetadata(state),
     loadingStartTime: getLoadingStartTime(state),
+    clickBehaviorSidebarDashcard: getClickBehaviorSidebarDashcard(state),
+    isAddParameterPopoverOpen: getIsAddParameterPopoverOpen(state),
   };
 };
 
@@ -67,6 +74,7 @@ type DashboardAppState = {
   mapStateToProps,
   mapDispatchToProps,
 )
+@fitViewport
 @title(({ dashboard }) => dashboard && dashboard.name)
 @titleWithLoadingTime("loadingStartTime")
 // NOTE: should use DashboardControls and DashboardData HoCs here?
@@ -75,7 +83,7 @@ export default class DashboardApp extends Component {
     addCardOnLoad: null,
   };
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const options = parseHashOptions(window.location.hash);
     if (options.add) {
       this.setState({ addCardOnLoad: parseInt(options.add) });
@@ -84,7 +92,7 @@ export default class DashboardApp extends Component {
 
   render() {
     return (
-      <div>
+      <div className="shrink-below-content-size full-height">
         <Dashboard addCardOnLoad={this.state.addCardOnLoad} {...this.props} />
         {/* For rendering modal urls */}
         {this.props.children}

@@ -1,50 +1,52 @@
 (ns metabase.driver.mysql-test
-  (:require [clojure
-             [string :as str]
-             [test :refer :all]]
-            [clojure.java.jdbc :as jdbc]
-            [metabase
-             [driver :as driver]
-             [query-processor :as qp]
-             [sync :as sync]
-             [test :as mt]
-             [util :as u]]
+  (:require [clojure.java.jdbc :as jdbc]
+            [clojure.string :as str]
+            [clojure.test :refer :all]
+            [metabase.db.metadata-queries :as metadata-queries]
+            [metabase.driver :as driver]
             [metabase.driver.sql-jdbc.connection :as sql-jdbc.conn]
-            [metabase.models
-             [database :refer [Database]]
-             [field :refer [Field]]]
+            [metabase.models.database :refer [Database]]
+            [metabase.models.field :refer [Field]]
+            [metabase.models.table :refer [Table]]
+            [metabase.query-processor :as qp]
+            [metabase.sync :as sync]
+            [metabase.sync.analyze.fingerprint :as fingerprint]
+            [metabase.test :as mt]
             [metabase.test.data.interface :as tx]
+            [metabase.util :as u]
             [toucan.db :as db]
-            [toucan.util.test :as tt]))
+            [toucan.hydrate :refer [hydrate]]
+            [toucan.util.test :as tt])
+  (:import [java.time ZonedDateTime ZoneId]
+           java.time.format.DateTimeFormatter))
 
 (deftest all-zero-dates-test
   (mt/test-driver :mysql
     (testing (str "MySQL allows 0000-00-00 dates, but JDBC does not; make sure that MySQL is converting them to NULL "
-                  "when returning them like we asked"))
-    (let [spec (sql-jdbc.conn/connection-details->spec :mysql (tx/dbdef->connection-details :mysql :server nil))]
-      (try
-        ;; Create the DB
-        (doseq [sql ["DROP DATABASE IF EXISTS all_zero_dates;"
-                     "CREATE DATABASE all_zero_dates;"]]
-          (jdbc/execute! spec [sql]))
-        ;; Create Table & add data
-        (let [details (tx/dbdef->connection-details :mysql :db {:database-name "all_zero_dates"})
-              spec    (-> (sql-jdbc.conn/connection-details->spec :mysql details)
-                          ;; allow inserting dates where value is '0000-00-00' -- this is disallowed by default on newer
-                          ;; versions of MySQL, but we still want to test that we can handle it correctly for older ones
-                          (assoc :sessionVariables "sql_mode='ALLOW_INVALID_DATES'"))]
-          (doseq [sql ["CREATE TABLE `exciting-moments-in-history` (`id` integer, `moment` timestamp);"
-                       "INSERT INTO `exciting-moments-in-history` (`id`, `moment`) VALUES (1, '0000-00-00');"]]
+                  "when returning them like we asked")
+      (let [spec (sql-jdbc.conn/connection-details->spec :mysql (tx/dbdef->connection-details :mysql :server nil))]
+        (try
+          ;; Create the DB
+          (doseq [sql ["DROP DATABASE IF EXISTS all_zero_dates;"
+                       "CREATE DATABASE all_zero_dates;"]]
             (jdbc/execute! spec [sql]))
-          ;; create & sync MB DB
-          (tt/with-temp Database [database {:engine "mysql", :details details}]
-            (sync/sync-database! database)
-            (mt/with-db database
-              ;; run the query
-              (is (= [[1 nil]]
-                     (mt/rows
-                       (mt/run-mbql-query exciting-moments-in-history)))))))))))
-
+          ;; Create Table & add data
+          (let [details (tx/dbdef->connection-details :mysql :db {:database-name "all_zero_dates"})
+                spec    (-> (sql-jdbc.conn/connection-details->spec :mysql details)
+                            ;; allow inserting dates where value is '0000-00-00' -- this is disallowed by default on newer
+                            ;; versions of MySQL, but we still want to test that we can handle it correctly for older ones
+                            (assoc :sessionVariables "sql_mode='ALLOW_INVALID_DATES'"))]
+            (doseq [sql ["CREATE TABLE `exciting-moments-in-history` (`id` integer, `moment` timestamp);"
+                         "INSERT INTO `exciting-moments-in-history` (`id`, `moment`) VALUES (1, '0000-00-00');"]]
+              (jdbc/execute! spec [sql]))
+            ;; create & sync MB DB
+            (tt/with-temp Database [database {:engine "mysql", :details details}]
+              (sync/sync-database! database)
+              (mt/with-db database
+                ;; run the query
+                (is (= [[1 nil]]
+                       (mt/rows
+                         (mt/run-mbql-query exciting-moments-in-history))))))))))))
 
 ;; Test how TINYINT(1) columns are interpreted. By default, they should be interpreted as integers, but with the
 ;; correct additional options, we should be able to change that -- see
@@ -58,16 +60,18 @@
       ["Empty Vending Machine" 0]]]])
 
 (defn- db->fields [db]
-  (let [table-ids (db/select-ids 'Table :db_id (u/get-id db))]
-    (set (map (partial into {}) (db/select [Field :name :base_type :special_type] :table_id [:in table-ids])))))
+  (let [table-ids (db/select-ids 'Table :db_id (u/the-id db))]
+    (set (map (partial into {}) (db/select [Field :name :base_type :semantic_type] :table_id [:in table-ids])))))
 
 (deftest tiny-int-1-test
   (mt/test-driver :mysql
     (mt/dataset tiny-int-ones
+      ;; trigger a full sync on this database so fields are categorized correctly
+      (sync/sync-database! (mt/db))
       (testing "By default TINYINT(1) should be a boolean"
-        (is (= #{{:name "number-of-cans", :base_type :type/Boolean, :special_type :type/Category}
-                 {:name "id", :base_type :type/Integer, :special_type :type/PK}
-                 {:name "thing", :base_type :type/Text, :special_type :type/Category}}
+        (is (= #{{:name "number-of-cans", :base_type :type/Boolean, :semantic_type :type/Category}
+                 {:name "id", :base_type :type/Integer, :semantic_type :type/PK}
+                 {:name "thing", :base_type :type/Text, :semantic_type :type/Category}}
                (db->fields (mt/db)))))
 
       (testing "if someone says specifies `tinyInt1isBit=false`, it should come back as a number instead"
@@ -75,10 +79,31 @@
                                     :details (assoc (:details (mt/db))
                                                     :additional-options "tinyInt1isBit=false")}]
           (sync/sync-database! db)
-          (is (= #{{:name "number-of-cans", :base_type :type/Integer, :special_type :type/Quantity}
-                   {:name "id", :base_type :type/Integer, :special_type :type/PK}
-                   {:name "thing", :base_type :type/Text, :special_type :type/Category}}
+          (is (= #{{:name "number-of-cans", :base_type :type/Integer, :semantic_type :type/Quantity}
+                   {:name "id", :base_type :type/Integer, :semantic_type :type/PK}
+                   {:name "thing", :base_type :type/Text, :semantic_type :type/Category}}
                  (db->fields db))))))))
+
+(tx/defdataset ^:private year-db
+  [["years"
+    [{:field-name "year_column", :base-type {:native "YEAR"}}]
+    [[2001] [2002] [1999]]]])
+
+(deftest year-test
+  (mt/test-driver :mysql
+    (mt/dataset year-db
+      (testing "By default YEAR"
+        (is (= #{{:name "year_column", :base_type :type/Date, :semantic_type nil}
+                 {:name "id", :base_type :type/Integer, :semantic_type :type/PK}}
+               (db->fields (mt/db)))))
+      (let [table  (db/select-one Table :db_id (u/id (mt/db)))
+            fields (db/select Field :table_id (u/id table) :name "year_column")]
+        (testing "Can select from this table"
+          (is (= [[#t "2001-01-01"] [#t "2002-01-01"] [#t "1999-01-01"]]
+                 (metadata-queries/table-rows-sample table fields (constantly conj)))))
+        (testing "We can fingerprint this table"
+          (is (= 1
+                 (:updated-fingerprints (#'fingerprint/fingerprint-table! table fields)))))))))
 
 (deftest db-timezone-id-test
   (mt/test-driver :mysql
@@ -208,3 +233,83 @@
                            ;; disable the middleware that normally converts `LocalTime` to `Strings` so we can verify
                            ;; our driver is actually doing the right thing
                            :middleware {:format-rows? false}))))))))))
+
+(defn- table-fingerprint
+  [{:keys [fields name]}]
+  {:name   name
+   :fields (map #(select-keys % [:name :base_type]) fields)})
+
+(deftest system-versioned-tables-test
+  (mt/test-driver :mysql
+    (testing "system versioned tables appear during a sync"
+      (let [spec (sql-jdbc.conn/connection-details->spec :mysql (tx/dbdef->connection-details :mysql :server nil))]
+       (try
+         ;; Create the DB
+         (doseq [sql ["DROP DATABASE IF EXISTS versioned_tables;"
+                      "CREATE DATABASE versioned_tables;"]]
+           (jdbc/execute! spec [sql]))
+         ;; Create Table & add data
+         (let [details (tx/dbdef->connection-details :mysql :db {:database-name "versioned_tables"})
+               spec    (sql-jdbc.conn/connection-details->spec :mysql details)
+               compat  (try
+                         (doseq [sql ["CREATE TABLE IF NOT EXISTS src1 (id INTEGER, t TEXT);"
+                                      "CREATE TABLE IF NOT EXISTS src2 (id INTEGER, t TEXT);"
+                                      "ALTER TABLE src2 ADD SYSTEM VERSIONING;"
+                                      "INSERT INTO src1 VALUES (1, '2020-03-01 12:20:35');"
+                                      "INSERT INTO src2 VALUES (1, '2020-03-01 12:20:35');"]]
+                           (jdbc/execute! spec [sql]))
+                         true
+                         (catch java.sql.SQLSyntaxErrorException se
+                           ;; if an error is received with SYSTEM VERSIONING mentioned, the version
+                           ;; of mysql or mariadb being tested against does not support system versioning,
+                           ;; so do not continue
+                           (if (re-matches #".*VERSIONING'.*" (.getMessage se))
+                             false
+                             (throw se))))]
+           (when compat
+             (tt/with-temp Database [database {:engine "mysql", :details details}]
+               (sync/sync-database! database)
+               (is (= [{:name   "src1"
+                        :fields [{:name      "id"
+                                  :base_type :type/Integer}
+                                 {:name      "t"
+                                  :base_type :type/Text}]}
+                       {:name   "src2"
+                        :fields [{:name      "id"
+                                  :base_type :type/Integer}
+                                 {:name      "t"
+                                  :base_type :type/Text}]}]
+                      (->> (hydrate (db/select Table :db_id (:id database) {:order-by [:name]}) :fields)
+                           (map table-fingerprint))))))))))))
+
+(deftest group-on-time-column-test
+  (let [driver :mysql]
+    (mt/test-driver driver
+      (let [db-name "time_test"
+            spec (sql-jdbc.conn/connection-details->spec :mysql (tx/dbdef->connection-details driver :server nil))]
+        (doseq [stmt ["DROP DATABASE IF EXISTS time_test;"
+                      "CREATE DATABASE time_test;"]]
+          (jdbc/execute! spec [stmt]))
+        (let [details (tx/dbdef->connection-details driver :db {:database-name db-name})
+              spec (sql-jdbc.conn/connection-details->spec driver details)]
+          (doseq [stmt ["DROP TABLE IF EXISTS time_table;"
+                        "CREATE TABLE time_table (id serial, mytime time);"
+                        "INSERT INTO time_table (mytime) VALUES ('00:00'), ('00:00'), ('23:01'), ('23:01'), ('18:43');"]]
+            (jdbc/execute! spec [stmt]))
+          (mt/with-temp Database [db {:engine driver :details details}]
+            (sync/sync-database! db)
+            (mt/with-db db
+              (testing "can group on TIME columns"
+                (let [now (ZonedDateTime/now (ZoneId/of "UTC"))
+                      now-date-str (.format now (DateTimeFormatter/ISO_LOCAL_DATE))
+                      add-date-fn (fn [t] [(str now-date-str "T" t)])]
+                  (is (= (map add-date-fn ["00:00:00Z" "18:43:00Z" "23:01:00Z"])
+                         (mt/rows
+                           (mt/run-mbql-query time_table
+                             {:breakout [[:datetime-field (mt/id :time_table :mytime) :minute]]
+                              :order-by [[:asc [:datetime-field (mt/id :time_table :mytime) :minute]]]}))))
+                  (is (= (map add-date-fn ["23:00:00Z" "18:00:00Z" "00:00:00Z"])
+                         (mt/rows
+                           (mt/run-mbql-query time_table
+                             {:breakout [[:datetime-field (mt/id :time_table :mytime) :hour]]
+                              :order-by [[:desc [:datetime-field (mt/id :time_table :mytime) :hour]]]})))))))))))))

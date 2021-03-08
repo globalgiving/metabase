@@ -1,29 +1,26 @@
 (ns metabase.test.data.mongo
-  (:require [cheshire
-             [core :as json]
-             [generate :as json.generate]]
+  (:require [cheshire.core :as json]
+            [cheshire.generate :as json.generate]
             [clojure.test :refer :all]
-            [metabase
-             [driver :as driver]
-             [models :refer [Field]]]
+            [metabase.driver :as driver]
             [metabase.driver.mongo.util :refer [with-mongo-connection]]
+            [metabase.models :refer [Field]]
             [metabase.test.data :as data]
             [metabase.test.data.interface :as tx]
-            [monger
-             [collection :as mc]
-             [core :as mg]])
+            [monger.collection :as mc]
+            [monger.core :as mg])
   (:import com.fasterxml.jackson.core.JsonGenerator))
 
 (tx/add-test-extensions! :mongo)
 
 (defmethod tx/dbdef->connection-details :mongo
   [_ _ dbdef]
-  {:dbname (tx/escaped-name dbdef)
+  {:dbname (tx/escaped-database-name dbdef)
    :host   "localhost"})
 
 (defn- destroy-db! [driver dbdef]
   (with-open [mongo-connection (mg/connect (tx/dbdef->connection-details driver :server dbdef))]
-    (mg/drop-db mongo-connection (tx/escaped-name dbdef))))
+    (mg/drop-db mongo-connection (tx/escaped-database-name dbdef))))
 
 (defmethod tx/create-db! :mongo
   [driver {:keys [table-definitions], :as dbdef} & {:keys [skip-drop-db?], :or {skip-drop-db? false}}]

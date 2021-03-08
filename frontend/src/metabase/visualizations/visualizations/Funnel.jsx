@@ -1,5 +1,3 @@
-/* @flow */
-
 import React, { Component } from "react";
 import { t } from "ttag";
 import {
@@ -24,7 +22,7 @@ import _ from "underscore";
 import cx from "classnames";
 
 import type { VisualizationProps } from "metabase-types/types/Visualization";
-import { TitleLegendHeader } from "metabase/visualizations/components/TitleLegendHeader";
+import TitleLegendHeader from "metabase/visualizations/components/TitleLegendHeader";
 
 export default class Funnel extends Component {
   props: VisualizationProps;
