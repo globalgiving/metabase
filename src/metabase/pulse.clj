@@ -39,7 +39,7 @@
         (let [query         (assoc query :async? false)
               process-query (fn []
                               (binding [qp.perms/*card-id* card-id]
-                                (qp/process-query-and-save-with-max-results-constraints!
+                                (qp/process-query-and-save-with-higher-max-results-constraints!
                                  query
                                  (merge {:executed-by pulse-creator-id
                                          :context     :pulse
